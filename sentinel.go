@@ -201,7 +201,17 @@ func (c *sentinelFailover) dial() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return net.DialTimeout("tcp", addr, c.opt.DialTimeout)
+
+	// TLS support for a connection to Redis itself.
+	if c.opt.TLSConfig == nil {
+		return net.DialTimeout("tcp", addr, c.opt.DialTimeout)
+	} else {
+		netDialer := &net.Dialer{
+			Timeout:   c.opt.DialTimeout,
+			KeepAlive: 5 * time.Minute,
+		}
+		return tls.DialWithDialer(netDialer, "tcp", addr, c.opt.TLSConfig)
+	}
 }
 
 func (c *sentinelFailover) MasterAddr() (string, error) {
@@ -252,7 +262,7 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 		c.sentinelAddrs[0], c.sentinelAddrs[i] = c.sentinelAddrs[i], c.sentinelAddrs[0]
 		c.setSentinel(sentinel)
 
-		addr := net.JoinHostPort(masterAddr[0], masterAddr[1])
+		addr := net.JoinHostPort(masterAddr[0], masterAddr[1][1:])
 		return addr, nil
 	}
 
@@ -280,7 +290,7 @@ func (c *sentinelFailover) getMasterAddr() string {
 		return ""
 	}
 
-	return net.JoinHostPort(addr[0], addr[1])
+	return net.JoinHostPort(addr[0], addr[1][1:])
 }
 
 func (c *sentinelFailover) switchMaster(addr string) {
@@ -365,7 +375,7 @@ func (c *sentinelFailover) listen(pubsub *PubSub) {
 				internal.Logf("sentinel: ignore addr for master=%q", parts[0])
 				continue
 			}
-			addr := net.JoinHostPort(parts[3], parts[4])
+			addr := net.JoinHostPort(parts[3], parts[4][1:])
 			c.switchMaster(addr)
 		}
 	}
