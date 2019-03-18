@@ -234,7 +234,8 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 
 	for i, sentinelAddr := range c.sentinelAddrs {
 		sentinel := NewSentinelClient(&Options{
-			Addr: sentinelAddr,
+			Addr:     sentinelAddr,
+			Password: c.opt.Password,
 
 			MaxRetries: c.opt.MaxRetries,
 
